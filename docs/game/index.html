@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mini Snake — Divyam</title>
+    <style>
+      :root {
+        --bg: #0f1226;
+        --fg: #e6e6e6;
+        --accent: #00ADB5;
+        --accent2: #6C63FF;
+      }
+      html, body { height: 100%; margin: 0; background: radial-gradient(1200px 700px at 50% -20%, #1a1d39, var(--bg)); color: var(--fg); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+      .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+      .card { width: min(92vw, 520px); background: #13183b; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.06); padding: 18px 18px 12px; }
+      h1 { margin: 0 0 6px; font-size: 18px; letter-spacing: .3px; text-align: center; }
+      .sub { text-align: center; opacity: .8; font-size: 12px; margin-bottom: 12px; }
+      .hud { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 8px 0 12px; flex-wrap: wrap; }
+      .btn { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; border: 0; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-weight: 600; letter-spacing: .2px; box-shadow: 0 6px 18px rgba(0,173,181,.35); }
+      .btn:active { transform: translateY(1px); }
+      .score { padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+      canvas { width: 100%; height: auto; image-rendering: pixelated; background: #0b0f24; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+      .foot { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; opacity: .8; }
+      a { color: var(--accent); text-decoration: none; }
+      .keys { display: grid; grid-template-columns: repeat(3, 36px); gap: 6px; place-content: center; margin: 10px auto 4px; opacity: .9; }
+      .key { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); font-weight: 700; }
+      .key.blank { visibility: hidden; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Mini Snake</h1>
+        <div class="sub">Arrow keys / WASD. Eat, grow, don't crash.</div>
+        <div class="hud">
+          <button id="start" class="btn">Start / Pause</button>
+          <button id="reset" class="btn" style="background:linear-gradient(135deg,#ff6b6b,#f06595)">Reset</button>
+          <div class="score">Score: <span id="score">0</span></div>
+        </div>
+        <canvas id="c" width="360" height="360"></canvas>
+        <div class="keys" aria-hidden="true">
+          <div class="key blank"></div><div class="key">▲</div><div class="key blank"></div>
+          <div class="key">◄</div><div class="key">▼</div><div class="key">►</div>
+        </div>
+        <div class="foot">
+          <span>Made by <a href="https://github.com/divyamojas" target="_blank">@divyamojas</a></span>
+          <a href="https://github.com/divyamojas/divyamojas" target="_blank">Back to README</a>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const cvs = document.getElementById('c');
+      const ctx = cvs.getContext('2d');
+      const size = 12; // grid cell
+      const cells = cvs.width / size; // 30
+      let snake, dir, food, score, loop, running = false, lastDir;
+
+      function rnd(n){ return Math.floor(Math.random()*n); }
+      function placeFood(){
+        do { food = {x:rnd(cells), y:rnd(cells)} } while (snake.some(s=>s.x===food.x&&s.y===food.y));
+      }
+      function reset(){
+        snake = [{x:15,y:15}];
+        dir = {x:1,y:0}; lastDir = dir;
+        score = 0; document.getElementById('score').textContent = score;
+        placeFood();
+        draw();
+      }
+      function drawGrid(){
+        ctx.clearRect(0,0,cvs.width,cvs.height);
+        for(let i=0;i<cells;i++){
+          for(let j=0;j<cells;j++){
+            if((i+j)%2===0){
+              ctx.fillStyle = '#0d122a';
+            } else {
+              ctx.fillStyle = '#0a0f22';
+            }
+            ctx.fillRect(i*size,j*size,size,size);
+          }
+        }
+      }
+      function draw(){
+        drawGrid();
+        // food
+        ctx.fillStyle = '#00ADB5';
+        ctx.fillRect(food.x*size, food.y*size, size, size);
+        // snake
+        snake.forEach((s,i)=>{
+          ctx.fillStyle = i===0? '#6C63FF' : '#c5c3ff';
+          ctx.fillRect(s.x*size, s.y*size, size, size);
+        });
+      }
+      function step(){
+        const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+        // wrap
+        head.x = (head.x + cells) % cells;
+        head.y = (head.y + cells) % cells;
+        // hit self?
+        if (snake.some((s,i)=> i && s.x===head.x && s.y===head.y)) {
+          pause();
+          flash('#ff6b6b');
+          return;
+        }
+        snake.unshift(head);
+        // eat?
+        if (head.x===food.x && head.y===food.y){
+          score++; document.getElementById('score').textContent = score;
+          flash('#00ADB5'); placeFood();
+        } else {
+          snake.pop();
+        }
+        lastDir = dir;
+        draw();
+      }
+      function flash(color){
+        cvs.style.boxShadow = `0 0 0 1px rgba(255,255,255,.06), 0 0 24px ${color}55`;
+        setTimeout(()=>cvs.style.boxShadow='inset 0 0 0 1px rgba(255,255,255,.06)', 200);
+      }
+      function play(){ if(running) return; running = true; loop = setInterval(step, 110); }
+      function pause(){ running=false; clearInterval(loop); }
+
+      document.getElementById('start').onclick = ()=> running ? pause() : play();
+      document.getElementById('reset').onclick = ()=>{ pause(); reset(); };
+
+      window.addEventListener('keydown', (e)=>{
+        const k = e.key.toLowerCase();
+        if(['arrowup','w'].includes(k) && lastDir.y!==1) dir = {x:0,y:-1};
+        else if(['arrowdown','s'].includes(k) && lastDir.y!==-1) dir = {x:0,y:1};
+        else if(['arrowleft','a'].includes(k) && lastDir.x!==1) dir = {x:-1,y:0};
+        else if(['arrowright','d'].includes(k) && lastDir.x!==-1) dir = {x:1,y:0};
+        else if(k===' '){ running?pause():play(); }
+      });
+
+      reset();
+    </script>
+  </body>
+  </html>
